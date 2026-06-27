@@ -1,0 +1,373 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique // e.g. "Super Admin", "Branch Admin", "Counsellor", "Faculty", "Content Manager", "Student", "Parent"
+  permissions String[] // List of allowed actions or routes
+  users       User[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  roleId       String
+  role         Role     @relation(fields: [roleId], references: [id])
+  branchId     String?  // If null, can access all branches (e.g. Super Admin)
+  branch       Branch?  @relation(fields: [branchId], references: [id])
+
+  // Student portal specific fields
+  rollNumber      String?   @unique
+  studentCourseId String?
+  studentCourse   Course?   @relation(fields: [studentCourseId], references: [id])
+  
+  // Student-Parent relationship (Self-relation)
+  parentId     String?
+  parent       User?        @relation("ParentToStudent", fields: [parentId], references: [id])
+  students     User[]       @relation("ParentToStudent")
+
+  // Portal records relations
+  attendance   Attendance[]
+  submissions  AssignmentSubmission[]
+  testResults  TestResult[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Branch {
+  id           String    @id @default(uuid())
+  name         String    @unique // e.g. "Kota Center", "Delhi Janakpuri"
+  address      String
+  city         String
+  state        String
+  phone        String
+  email        String
+  googleMapUrl String
+  slug         String    @unique // SEO slug e.g. "kota", "delhi-janakpuri"
+  photos       String[]  // URLs of photos
+
+  users        User[]
+  results      Result[]
+  leads        Lead[]
+  enquiries    Enquiry[]
+  announcements Announcement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Course {
+  id          String   @id @default(uuid())
+  title       String   @unique // e.g. "NEET Repeaters", "JEE Advanced"
+  description String
+  duration    String   // e.g. "2 Years", "1 Year"
+  fees        Float
+  features    String[] // List of program details
+  eligibility String
+  ctaText     String   @default("Enroll Now")
+  ctaUrl      String   @default("#enroll")
+  isFeatured  Boolean  @default(false)
+
+  // Portal relations
+  students       User[]
+  studyMaterials StudyMaterial[]
+  assignments    Assignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum ExamType {
+  NEET
+  JEE_MAIN
+  JEE_ADVANCED
+}
+
+model Result {
+  id          String   @id @default(uuid())
+  studentName String
+  photoUrl    String
+  examType    ExamType
+  rank        Int      // All India Rank (AIR)
+  marks       String   // e.g. "685/720", "295/360"
+  year        Int
+  college     String   // e.g. "AIIMS Delhi", "IIT Bombay"
+  category    String   // e.g. "General", "OBC"
+  isFeatured  Boolean  @default(false)
+  branchId    String?
+  branch      Branch?  @relation(fields: [branchId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TestimonialStatus {
+  PENDING
+  APPROVED
+}
+
+model Testimonial {
+  id               String            @id @default(uuid())
+  studentName      String
+  course           String            // e.g. "NEET 2-Year Program"
+  photoUrl         String
+  videoUrl         String?
+  review           String
+  parentReview     String?
+  year             Int
+  rank             String?           // e.g. "AIR 42" or "AIR 87"
+  status           TestimonialStatus @default(PENDING)
+  isFeatured       Boolean           @default(false)
+  homepageFeatured Boolean           @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FAQ {
+  id       String @id @default(uuid())
+  question String
+  answer   String
+  category String // e.g. "NEET", "JEE", "Admissions", "Fees", "Scholarships", "Hostel", "Faculty"
+  order    Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Blog {
+  id              String   @id @default(uuid())
+  title           String
+  slug            String   @unique
+  content         String
+  author          String
+  category        String   // e.g. "NEET Preparation", "JEE Preparation", "Exam Updates", "Study Tips", "Career Guidance", "Scholarships", "News"
+  metaTitle       String
+  metaDescription String
+  ogImage         String?
+  tags            String[]
+  faqSchema       String?  // JSON-LD FAQs representation
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Faculty {
+  id              String   @id @default(uuid())
+  name            String
+  photoUrl        String
+  qualification   String
+  experience      String   // e.g. "12+ Years"
+  subjects        String[] // e.g. ["Physics", "Mechanics"]
+  achievements    String
+  bio             String
+  resultsProduced String
+  isFeatured      Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Scholarship {
+  id               String   @id @default(uuid())
+  title            String
+  eligibility      String
+  examDate         String   // String description e.g. "Jan 15, 2027" or Date
+  duration         String
+  coverage         String   // e.g. "Up to 100% Tuition Fee Waiver"
+  terms            String[]
+  leads            Lead[]   // Link leads submitting applications
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  ENROLLED
+}
+
+model Lead {
+  id            String      @id @default(uuid())
+  studentName   String
+  phone         String
+  email         String
+  examType      String?     // "NEET", "JEE", "FOUNDATION"
+  branchId      String?
+  branch        Branch?     @relation(fields: [branchId], references: [id])
+  scholarshipId String?
+  scholarship   Scholarship? @relation(fields: [scholarshipId], references: [id])
+  status        LeadStatus  @default(NEW)
+  source        String      @default("Website Form") // UTM source
+  utmCampaign   String?
+  utmSource     String?
+  utmMedium     String?
+  message       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Enquiry {
+  id       String  @id @default(uuid())
+  name     String
+  email    String
+  phone    String
+  subject  String
+  message  String
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id])
+  status   String  @default("NEW") // "NEW", "RESOLVED"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Setting {
+  id    String @id @default(uuid())
+  key   String @unique // e.g. "brand_name", "head_office_phone"
+  value String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SEO {
+  id              String   @id @default(uuid())
+  pagePath        String   @unique // e.g. "/", "/courses", "/branches"
+  metaTitle       String
+  metaDescription String
+  keywords        String[]
+  ogTitle         String?
+  ogDescription   String?
+  ogImage         String?
+  schemaMarkup    String?  // Custom JSON-LD schema block
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Media {
+  id       String @id @default(uuid())
+  fileName String
+  fileUrl  String
+  fileType String
+  fileSize Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ----------------------------------------------------------------------
+// NEW STUDENT & PARENT PORTAL SCHEMAS
+// ----------------------------------------------------------------------
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+}
+
+model Attendance {
+  id        String           @id @default(uuid())
+  studentId String
+  student   User             @relation(fields: [studentId], references: [id])
+  date      DateTime
+  status    AttendanceStatus
+  remarks   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, date])
+}
+
+model StudyMaterial {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  fileUrl     String
+  subject     String   // e.g. "Physics", "Chemistry"
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Assignment {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  fileUrl     String?
+  dueDate     DateTime
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id])
+
+  submissions AssignmentSubmission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  GRADED
+  LATE
+}
+
+model AssignmentSubmission {
+  id           String           @id @default(uuid())
+  assignmentId String
+  assignment   Assignment       @relation(fields: [assignmentId], references: [id])
+  studentId    String
+  student      User             @relation(fields: [studentId], references: [id])
+  fileUrl      String
+  submittedAt  DateTime         @default(now())
+  marks        String?          // e.g. "8/10"
+  feedback     String?
+  status       SubmissionStatus @default(SUBMITTED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TestResult {
+  id            String   @id @default(uuid())
+  studentId     String
+  student       User     @relation(fields: [studentId], references: [id])
+  testName      String   // e.g. "NEET Grand Mock Test #5"
+  testDate      DateTime
+  subject       String   // e.g. "Physics", "Full Syllabus"
+  scoreObtained Float
+  maxScore      Float
+  rank          Int?
+  remarks       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Announcement {
+  id         String   @id @default(uuid())
+  title      String
+  content    String
+  targetRole String   // "ALL", "STUDENT", "PARENT", "FACULTY"
+  branchId   String?
+  branch     Branch?  @relation(fields: [branchId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

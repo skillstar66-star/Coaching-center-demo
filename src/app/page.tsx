@@ -1,65 +1,161 @@
-import Image from "next/image";
+import { Metadata } from "next"
+import { Hero } from "@/sections/hero"
+import { Dream } from "@/sections/dream"
+import { PainPoints } from "@/sections/pain-points"
+import { Transformation } from "@/sections/transformation"
+import { Comparison } from "@/sections/comparison"
+import { ResultsWall } from "@/sections/results-wall"
+import { FacultyShowcase } from "@/sections/faculty-showcase"
+import { Courses } from "@/sections/courses"
+import { Testimonials } from "@/sections/testimonials"
+import { Scholarship } from "@/sections/scholarship"
+import { ParentTrust } from "@/sections/parent-trust"
+import { CampusGallery } from "@/sections/campus-gallery"
+import { LeadMagnet } from "@/sections/lead-magnet"
+import { SuccessTools } from "@/sections/success-tools"
+import { FAQ } from "@/sections/faq"
+import { FinalCTA } from "@/sections/final-cta"
+import { GsapAnimations } from "@/components/gsap-animations"
+import { BranchesShowcase } from "@/sections/branches-showcase"
+import {
+  getBranches,
+  getCourses,
+  getResults,
+  getTestimonials,
+  getFAQs,
+  getFaculty,
+  getSEOByPath
+} from "@/lib/data-service"
 
-export default function Home() {
+export async function generateMetadata(): Promise<Metadata> {
+  const seo = await getSEOByPath("/")
+  if (!seo) return {}
+  return {
+    title: seo.metaTitle,
+    description: seo.metaDescription,
+    keywords: seo.keywords,
+    openGraph: seo.ogTitle ? {
+      title: seo.ogTitle,
+      description: seo.ogDescription || undefined,
+      images: seo.ogImage ? [{ url: seo.ogImage }] : undefined,
+    } : undefined
+  }
+}
+
+export default async function Home() {
+  // Parallel fetch on the server side
+  const [branches, courses, results, testimonials, faqs, faculty] = await Promise.all([
+    getBranches(),
+    getCourses(),
+    getResults(),
+    getTestimonials(),
+    getFAQs(),
+    getFaculty(),
+  ])
+
+  // Build JSON-LD schemas
+  const orgSchema = {
+    "@context": "https://schema.org",
+    "@type": "EducationalOrganization",
+    "name": "SkillStar",
+    "url": "https://skillstar.com",
+    "logo": "https://skillstar.com/favicon.ico",
+    "description": "India's premium coaching institute for NEET & JEE Advanced prep.",
+    "contactPoint": branches.map(b => ({
+      "@type": "ContactPoint",
+      "telephone": b.phone,
+      "contactType": "admissions",
+      "email": b.email,
+      "areaServed": "IN"
+    }))
+  }
+
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqs.map(f => ({
+      "@type": "Question",
+      "name": f.question,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": f.answer
+      }
+    }))
+  }
+
+  const courseSchema = courses.map(c => ({
+    "@context": "https://schema.org",
+    "@type": "Course",
+    "name": c.title,
+    "description": c.description,
+    "provider": {
+      "@type": "EducationalOrganization",
+      "name": "SkillStar",
+      "sameAs": "https://skillstar.com"
+    }
+  }))
+
+  const localBusinessSchemas = branches.map(b => ({
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "name": `SkillStar - ${b.name}`,
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": b.address,
+      "addressLocality": b.city,
+      "addressRegion": b.state,
+      "addressCountry": "IN"
+    },
+    "telephone": b.phone,
+    "email": b.email,
+    "url": `https://skillstar.com/branches/${b.slug}`
+  }))
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <>
+      {/* Schema Injection */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(orgSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
+      {courseSchema.map((cs, idx) => (
+        <script
+          key={`course-schema-${idx}`}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(cs) }}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+      ))}
+      {localBusinessSchemas.map((lbs, idx) => (
+        <script
+          key={`local-schema-${idx}`}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(lbs) }}
+        />
+      ))}
+
+      {/* Sections */}
+      <Hero />
+      <Dream />
+      <PainPoints />
+      <Transformation />
+      <Comparison />
+      <ResultsWall items={results} />
+      <FacultyShowcase items={faculty} />
+      <Courses items={courses} />
+      <Testimonials items={testimonials} />
+      <Scholarship />
+      <ParentTrust />
+      <CampusGallery />
+      <BranchesShowcase branches={branches} />
+      <LeadMagnet />
+      <SuccessTools />
+      <FAQ items={faqs} />
+      <FinalCTA />
+      <GsapAnimations />
+    </>
+  )
 }
